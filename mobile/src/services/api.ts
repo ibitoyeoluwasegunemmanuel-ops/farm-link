@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const BASE_URL = __DEV__
   ? 'http://10.0.2.2:5000/api'   // Android emulator → localhost
-  : 'https://api.farmlink.ng/api';
+  : 'https://farm-link-bmiv-cpk3unx1j-ibitoyeoluwasegunemmanuel-ops-projects.vercel.app/api';
 
 export const api = axios.create({
   baseURL: BASE_URL,
