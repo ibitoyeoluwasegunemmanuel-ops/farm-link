@@ -3,10 +3,22 @@ const cors = require('cors');
 const admin = require('firebase-admin');
 require('dotenv').config();
 
-// Initialize Firebase Admin
-const serviceAccount = require('./serviceAccountKey.json');
+// Initialize Firebase Admin — credentials come from FIREBASE_SERVICE_ACCOUNT env var on Vercel,
+// or fall back to local serviceAccountKey.json for local dev.
+let firebaseCredential;
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  firebaseCredential = admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT));
+} else {
+  try {
+    const serviceAccount = require('./serviceAccountKey.json');
+    firebaseCredential = admin.credential.cert(serviceAccount);
+  } catch {
+    firebaseCredential = admin.credential.applicationDefault();
+  }
+}
+
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
+  credential: firebaseCredential,
   storageBucket: process.env.FIREBASE_STORAGE_BUCKET
 });
 
@@ -39,9 +51,15 @@ app.get('/', (req, res) => {
   res.json({ message: 'FarmLink API Running', version: '1.0.0' });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 FarmLink Server running on port ${PORT}`);
-});
+// Only start the HTTP server when running locally (not on Vercel serverless)
+if (process.env.NODE_ENV !== 'production' || process.env.VERCEL !== '1') {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`FarmLink Server running on port ${PORT}`);
+  });
+}
 
-module.exports = { db, bucket, admin };// Entry point for backend server
+module.exports = app;
+module.exports.db = db;
+module.exports.bucket = bucket;
+module.exports.admin = admin;
