@@ -1,9 +1,12 @@
-import axios, { AxiosError, AxiosRequestConfig } from 'axios';
+import axios, { AxiosError } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = __DEV__
-  ? 'http://10.0.2.2:5000/api'   // Android emulator → localhost
-  : 'https://farm-link-bmiv-cpk3unx1j-ibitoyeoluwasegunemmanuel-ops-projects.vercel.app/api';
+const PROD_URL = 'https://farm-link-bmiv-cpk3unx1j-ibitoyeoluwasegunemmanuel-ops-projects.vercel.app/api';
+const DEV_URL = 'http://10.0.2.2:3000/api';
+
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL
+  ? `${process.env.EXPO_PUBLIC_API_URL}/api`
+  : __DEV__ ? DEV_URL : PROD_URL;
 
 export const api = axios.create({
   baseURL: BASE_URL,
@@ -11,16 +14,12 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Attach auth token on every request
 api.interceptors.request.use(async (config) => {
   const token = await AsyncStorage.getItem('@farmlink_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
-// Global error handler
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
