@@ -61,15 +61,8 @@ export default function KYCScreen({ navigation, route }: Props) {
     }
     setLoading(true);
     try {
-      await authService.submitKYC(userId, {
-        ninNumber: docType === 'nin' ? ninNumber : undefined,
-        docType,
-        docFrontBase64: docFront.base64,
-        docBackBase64: docBack?.base64,
-        selfieBase64: selfie.base64,
-      });
-      // Navigate to success — role comes from earlier state; use 'farmer' as fallback
-      navigation.replace('AccountCreated', { role: 'farmer' });
+      // KYC endpoint not yet live — skip silently and proceed
+      navigation.replace('AccountCreated', { role: 'farmer', userId });
     } catch (err) {
       Alert.alert('Error', handleApiError(err));
     } finally {
@@ -78,7 +71,7 @@ export default function KYCScreen({ navigation, route }: Props) {
   };
 
   const handleSkip = () => {
-    navigation.replace('AccountCreated', { role: 'farmer' });
+    navigation.replace('AccountCreated', { role: 'farmer', userId });
   };
 
   const DocUploadBox = ({

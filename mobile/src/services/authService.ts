@@ -2,45 +2,41 @@ import { api } from './api';
 import { UserRole } from '../navigation/types';
 
 export const authService = {
-  sendOTP: (phone: string) =>
-    api.post('/auth/send-otp', { phone }),
+  sendOTP: (phoneNumber: string) =>
+    api.post('/auth/send-otp', { phoneNumber }),
 
-  verifyOTP: (phone: string, otp: string) =>
-    api.post<{ token: string; userId: string; isNewUser: boolean }>('/auth/verify-otp', { phone, otp }),
+  verifyOTP: (phoneNumber: string, otp: string) =>
+    api.post<{
+      success: boolean;
+      userId: string;
+      token: string;
+      isNewUser: boolean;
+      user: Record<string, any>;
+    }>('/auth/verify-otp', { phoneNumber, otp }),
 
   setRole: (userId: string, role: UserRole) =>
     api.post('/auth/set-role', { userId, role }),
 
   createProfile: (userId: string, data: {
-    name: string;
+    fullName: string;
     email?: string;
     state: string;
     farmName?: string;
     bio?: string;
-    avatarBase64?: string;
+    avatar?: string;
   }) =>
-    api.post('/auth/create-profile', { userId, ...data }),
+    api.post('/auth/profile', { userId, ...data }),
 
-  submitKYC: (userId: string, data: {
-    ninNumber?: string;
-    bvnNumber?: string;
-    docType: string;
-    docFrontBase64: string;
-    docBackBase64?: string;
-    selfieBase64: string;
-  }) =>
-    api.post('/auth/kyc', { userId, ...data }),
+  getProfile: (userId: string) =>
+    api.get<{ success: boolean; user: Record<string, any> }>(`/auth/profile/${userId}`),
 
-  getProfile: () =>
-    api.get('/auth/profile'),
-
-  updateProfile: (data: Partial<{
-    name: string;
+  updateProfile: (userId: string, data: Partial<{
+    fullName: string;
     email: string;
     state: string;
     bio: string;
     farmName: string;
-    avatarBase64: string;
+    avatar: string;
   }>) =>
-    api.put('/auth/profile', data),
+    api.post('/auth/profile', { userId, ...data }),
 };

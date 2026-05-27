@@ -10,7 +10,7 @@ export type AuthStackParamList = {
   RoleSelection: { userId: string };
   CreateProfile: { userId: string; role: UserRole };
   KYC: { userId: string };
-  AccountCreated: { role: UserRole };
+  AccountCreated: { role: UserRole; userId: string };
 };
 
 // Bottom tab navigator

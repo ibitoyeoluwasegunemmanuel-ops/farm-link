@@ -15,6 +15,7 @@ import { AuthStackParamList } from '../../navigation/types';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Spacing, Radius } from '../../constants/spacing';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Button, OTPInput } from '../../components/common';
 import { authService } from '../../services/authService';
 import { handleApiError } from '../../services/api';
@@ -61,14 +62,16 @@ export default function OTPScreen({ navigation, route }: Props) {
     setLoading(true);
     try {
       const res = await authService.verifyOTP(phone, otp);
-      const { token, userId, isNewUser } = res.data;
+      const { token, userId, isNewUser, user } = res.data;
 
       if (isNewUser || purpose === 'signup') {
+        // Save token for later use in AccountCreated; don't authenticate yet
+        await AsyncStorage.setItem('@farmlink_pending_token', token);
+        await AsyncStorage.setItem('@farmlink_pending_userid', userId);
         navigation.replace('RoleSelection', { userId });
       } else {
-        // Existing user — fetch profile then set
-        const profileRes = await authService.getProfile();
-        await setUser(profileRes.data.user, token);
+        // Existing user — authenticate immediately
+        await setUser(user as any, token);
         // RootNavigator will redirect to Main automatically
       }
     } catch (err) {

@@ -15,6 +15,7 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Spacing, Radius } from '../../constants/spacing';
 import { Button } from '../../components/common';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../../store/authStore';
 import { authService } from '../../services/authService';
 
@@ -29,7 +30,7 @@ const ROLE_PERKS: Record<UserRole, string[]> = {
 };
 
 export default function AccountCreatedScreen({ route }: Props) {
-  const { role } = route.params;
+  const { role, userId } = route.params;
   const setUser = useAuthStore((s) => s.setUser);
 
   const checkScale = useRef(new Animated.Value(0)).current;
@@ -63,18 +64,20 @@ export default function AccountCreatedScreen({ route }: Props) {
 
   const handleContinue = async () => {
     try {
-      const profileRes = await authService.getProfile();
-      // Token is fetched from storage (set during OTP verify)
-      const { AsyncStorage } = await import('@react-native-async-storage/async-storage');
-      const token = await AsyncStorage.getItem('@farmlink_token');
+      const token = await AsyncStorage.getItem('@farmlink_pending_token');
+      const profileRes = await authService.getProfile(userId);
       if (profileRes.data.user && token) {
-        await setUser(profileRes.data.user, token);
+        await setUser(profileRes.data.user as any, token);
+        await AsyncStorage.multiRemove(['@farmlink_pending_token', '@farmlink_pending_userid']);
       }
     } catch {
-      // If profile fetch fails (e.g., no network), still proceed — token already in storage
-      const { AsyncStorage } = await import('@react-native-async-storage/async-storage');
-      const [userStr, token] = await AsyncStorage.multiGet(['@farmlink_user', '@farmlink_token']);
-      // RootNavigator will redirect once authStore is hydrated on next launch
+      // Network error — try with whatever is stored
+      const token = await AsyncStorage.getItem('@farmlink_pending_token');
+      if (token) {
+        const fallbackUser = { id: userId, phoneNumber: '', isVerified: true, profileComplete: true };
+        await setUser(fallbackUser as any, token);
+        await AsyncStorage.multiRemove(['@farmlink_pending_token', '@farmlink_pending_userid']);
+      }
     }
   };
 

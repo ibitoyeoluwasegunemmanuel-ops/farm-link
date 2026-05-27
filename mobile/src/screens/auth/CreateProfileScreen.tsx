@@ -92,12 +92,11 @@ export default function CreateProfileScreen({ navigation, route }: Props) {
     setLoading(true);
     try {
       await authService.createProfile(userId, {
-        name: name.trim(),
+        fullName: name.trim(),
         email: email.trim() || undefined,
         state,
         farmName: farmName.trim() || undefined,
         bio: bio.trim() || undefined,
-        avatarBase64: avatarBase64 ?? undefined,
       });
       navigation.replace('KYC', { userId });
     } catch (err) {

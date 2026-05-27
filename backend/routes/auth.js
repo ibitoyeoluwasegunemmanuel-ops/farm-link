@@ -170,4 +170,25 @@ router.get('/profile/:userId', async (req, res) => {
   }
 });
 
+// KYC Submission (stub — store for manual review)
+router.post('/kyc', async (req, res) => {
+  try {
+    const { userId, docType, ninNumber } = req.body;
+    await getDb().collection('kyc_submissions').doc(userId).set({
+      userId,
+      docType,
+      ninNumber: ninNumber || null,
+      status: 'pending',
+      submittedAt: new Date(),
+    });
+    await getDb().collection('users').doc(userId).update({
+      kycSubmitted: true,
+      updatedAt: new Date(),
+    });
+    res.json({ success: true, message: 'KYC submitted for review' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to submit KYC', details: error.message });
+  }
+});
+
 module.exports = router;
