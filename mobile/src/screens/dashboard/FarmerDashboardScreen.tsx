@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -10,6 +10,8 @@ import { Spacing, Radius } from '../../constants/spacing';
 import { Header } from '../../components/common';
 import { formatCurrency } from '../../constants/theme';
 import { useAuthStore } from '../../store/authStore';
+import { api } from '../../services/api';
+import { harvestService, Harvest } from '../../services/harvestService';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'FarmerDashboard'>;
 
@@ -20,19 +22,28 @@ const QUICK_ACTIONS = [
   { icon: 'cloud-outline', label: 'Weather', color: '#FF9800' },
 ];
 
-const MY_LISTINGS = [
-  { id: '1', name: 'Fresh Tomatoes', qty: '500 kg', price: 280000, sold: 30, status: 'Active' },
-  { id: '2', name: 'White Maize', qty: '2 tonnes', price: 760000, sold: 60, status: 'Active' },
-  { id: '3', name: 'Cassava Tubers', qty: '1 tonne', price: 85000, sold: 100, status: 'Sold Out' },
-];
-
-const RECENT_ORDERS = [
-  { id: 'o1', buyer: 'Foodco Supermarket', product: 'Tomatoes × 200kg', amount: 112000, status: 'Processing' },
-  { id: 'o2', buyer: 'Ahmed Traders', product: 'Maize × 1 tonne', amount: 380000, status: 'Delivered' },
-];
-
 export default function FarmerDashboardScreen({ navigation }: Props) {
   const user = useAuthStore(s => s.user);
+  const [stats, setStats] = useState({ totalEarnings: 0, pendingPayments: 0, activeHarvests: 0 });
+  const [listings, setListings] = useState<Harvest[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchData = async () => {
+    if (!user?.id) return;
+    try {
+      const [statsRes, listingsRes] = await Promise.all([
+        api.get(`/farmers/dashboard/${user.id}`),
+        harvestService.getFarmerListings(user.id),
+      ]);
+      if (statsRes.data.stats) setStats(statsRes.data.stats);
+      if (listingsRes.data.data) setListings(listingsRes.data.data.slice(0, 3));
+    } catch {}
+    setRefreshing(false);
+  };
+
+  useEffect(() => { fetchData(); }, [user?.id]);
+
+  const onRefresh = () => { setRefreshing(true); fetchData(); };
 
   return (
     <View style={styles.flex}>
@@ -51,21 +62,25 @@ export default function FarmerDashboardScreen({ navigation }: Props) {
 
         <View style={styles.earningsCard}>
           <View style={styles.earningItem}>
-            <Text style={styles.earningLabel}>This Month</Text>
-            <Text style={styles.earningVal}>{formatCurrency(1245000)}</Text>
+            <Text style={styles.earningLabel}>Total Earned</Text>
+            <Text style={styles.earningVal}>{formatCurrency(stats.totalEarnings)}</Text>
           </View>
           <View style={[styles.earningItem, { borderLeftWidth: 1, borderRightWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }]}>
-            <Text style={styles.earningLabel}>In Escrow</Text>
-            <Text style={styles.earningVal}>{formatCurrency(380000)}</Text>
+            <Text style={styles.earningLabel}>Active Listings</Text>
+            <Text style={styles.earningVal}>{stats.activeHarvests}</Text>
           </View>
           <View style={styles.earningItem}>
             <Text style={styles.earningLabel}>Pending</Text>
-            <Text style={styles.earningVal}>{formatCurrency(112000)}</Text>
+            <Text style={styles.earningVal}>{stats.pendingPayments}</Text>
           </View>
         </View>
       </LinearGradient>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
+      >
         <View style={styles.quickActionsRow}>
           {QUICK_ACTIONS.map((a, i) => (
             <TouchableOpacity key={i} style={styles.quickAction}>
@@ -87,19 +102,22 @@ export default function FarmerDashboardScreen({ navigation }: Props) {
             <Text style={styles.sectionTitle}>My Listings</Text>
             <TouchableOpacity><Text style={styles.seeAll}>See All</Text></TouchableOpacity>
           </View>
-          {MY_LISTINGS.map(l => (
+          {listings.length === 0 && (
+            <Text style={styles.emptyText}>No listings yet. Tap "Add Listing" to start.</Text>
+          )}
+          {listings.map(l => (
             <View key={l.id} style={styles.listingRow}>
               <View style={styles.listingInfo}>
-                <Text style={styles.listingName}>{l.name}</Text>
-                <Text style={styles.listingQty}>{l.qty}</Text>
+                <Text style={styles.listingName}>{l.cropType}</Text>
+                <Text style={styles.listingQty}>{l.quantity} {l.unit}</Text>
               </View>
               <View style={styles.listingMid}>
                 <View style={styles.progressBarSmall}>
-                  <View style={[styles.progressFillSmall, { width: `${l.sold}%`, backgroundColor: l.sold === 100 ? Colors.textTertiary : Colors.primary }]} />
+                  <View style={[styles.progressFillSmall, { width: '40%', backgroundColor: Colors.primary }]} />
                 </View>
-                <Text style={styles.soldPct}>{l.sold}% sold</Text>
+                <Text style={styles.soldPct}>{l.status}</Text>
               </View>
-              <Text style={styles.listingPrice}>{formatCurrency(l.price)}</Text>
+              <Text style={styles.listingPrice}>{formatCurrency(l.pricePerUnit)}</Text>
             </View>
           ))}
         </View>
@@ -109,21 +127,7 @@ export default function FarmerDashboardScreen({ navigation }: Props) {
             <Text style={styles.sectionTitle}>Recent Orders</Text>
             <TouchableOpacity><Text style={styles.seeAll}>See All</Text></TouchableOpacity>
           </View>
-          {RECENT_ORDERS.map(o => (
-            <View key={o.id} style={styles.orderRow}>
-              <View style={styles.orderAvatar}><Text style={styles.orderAvatarText}>{o.buyer[0]}</Text></View>
-              <View style={styles.orderInfo}>
-                <Text style={styles.orderBuyer}>{o.buyer}</Text>
-                <Text style={styles.orderProduct}>{o.product}</Text>
-              </View>
-              <View style={styles.orderRight}>
-                <Text style={styles.orderAmount}>{formatCurrency(o.amount)}</Text>
-                <View style={[styles.orderStatus, { backgroundColor: o.status === 'Delivered' ? '#E8F5E9' : '#FFF8E1' }]}>
-                  <Text style={[styles.orderStatusText, { color: o.status === 'Delivered' ? Colors.success : Colors.warning }]}>{o.status}</Text>
-                </View>
-              </View>
-            </View>
-          ))}
+          <Text style={styles.emptyText}>Recent orders will appear here once buyers place orders.</Text>
         </View>
 
         <View style={styles.section}>
@@ -193,4 +197,5 @@ const styles = StyleSheet.create({
   advisoryCard: { flexDirection: 'row', gap: Spacing[3], padding: Spacing[3], backgroundColor: Colors.background, borderRadius: Radius.lg },
   advisoryTitle: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textPrimary },
   advisoryText: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, lineHeight: 18, marginTop: 2 },
+  emptyText: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textTertiary, textAlign: 'center', paddingVertical: Spacing[2] },
 });
