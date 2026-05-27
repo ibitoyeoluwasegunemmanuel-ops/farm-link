@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Image,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,32 +15,50 @@ import { MarketplaceStackParamList } from '../../navigation/types';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Spacing, Radius } from '../../constants/spacing';
-import { Button, Avatar, VerifiedBadge } from '../../components/common';
+import { Button, Avatar } from '../../components/common';
 import { formatCurrency } from '../../constants/theme';
 import { useCartStore } from '../../store/cartStore';
+import { harvestService, Harvest } from '../../services/harvestService';
 
 type Props = NativeStackScreenProps<MarketplaceStackParamList, 'ProductDetail'>;
+
+const FALLBACK: Harvest = {
+  id: '', farmerId: 'farmer1', cropType: 'White Maize', quantity: 200, unit: 'bag (100kg)',
+  pricePerUnit: 55000, totalPrice: 0, quality: 'Grade A', status: 'available',
+  description: 'Premium grade white maize, freshly harvested from our certified organic farm.',
+  location: { state: 'Lagos', town: 'Ikorodu' },
+  farmer: { id: 'farmer1', fullName: 'Emeka Okafor', farmName: 'Green Oasis Farm', rating: 4.8 },
+};
 
 export default function ProductDetailScreen({ navigation, route }: Props) {
   const [qty, setQty] = useState(1);
   const [wishlisted, setWishlisted] = useState(false);
+  const [harvest, setHarvest] = useState<Harvest>(FALLBACK);
+  const [loading, setLoading] = useState(true);
   const addItem = useCartStore((s) => s.addItem);
 
+  useEffect(() => {
+    harvestService.getListing(route.params.productId)
+      .then((res) => setHarvest(res.data.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [route.params.productId]);
+
   const product = {
-    id: route.params.productId,
-    name: 'White Maize',
-    price: 55000,
-    unit: 'bag (100kg)',
-    quantity: 200,
-    farmerName: 'Emeka Okafor',
-    farmName: 'Green Oasis Farm',
-    location: 'Ikorodu, Lagos',
-    verified: true,
-    rating: 4.8,
-    totalSales: 1240,
-    description: 'Premium grade white maize, freshly harvested from our certified organic farm. Ideal for poultry feed, human consumption, and industrial use. Well dried to 12% moisture content.',
-    quality: 'Grade A',
-    harvestDate: 'Nov 2024',
+    id: harvest.id || route.params.productId,
+    name: harvest.cropType,
+    price: harvest.pricePerUnit,
+    unit: harvest.unit,
+    quantity: harvest.quantity,
+    farmerName: harvest.farmer?.fullName || 'Farmer',
+    farmName: harvest.farmer?.farmName || '',
+    location: `${harvest.location?.town || ''}, ${harvest.location?.state || ''}`.replace(/^, |, $/, ''),
+    verified: !!harvest.farmer,
+    rating: harvest.farmer?.rating || 4.5,
+    totalSales: harvest.views || 0,
+    description: harvest.description || '',
+    quality: harvest.quality || 'Grade A',
+    harvestDate: harvest.harvestDate ? new Date(harvest.harvestDate).toLocaleDateString('en-NG', { month: 'short', year: 'numeric' }) : '',
     moq: 1,
   };
 
@@ -52,7 +70,7 @@ export default function ProductDetailScreen({ navigation, route }: Props) {
       unit: product.unit,
       imageUri: undefined,
       farmerName: product.farmerName,
-      farmerId: 'farmer1',
+      farmerId: harvest.farmerId,
       maxQuantity: product.quantity,
     });
     Alert.alert('Added to Cart', `${qty} × ${product.name} added.`, [
@@ -65,6 +83,14 @@ export default function ProductDetailScreen({ navigation, route }: Props) {
     handleAddToCart();
     navigation.navigate('Checkout');
   };
+
+  if (loading) {
+    return (
+      <View style={[styles.flex, { alignItems: 'center', justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.flex}>
